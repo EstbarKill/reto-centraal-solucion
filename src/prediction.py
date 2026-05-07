@@ -47,16 +47,19 @@ def _parse_ts(row: dict[str, Any]) -> datetime | None:
 
 def _load_events_in_window(machine_id: str, hours: int = 24) -> list[dict[str, Any]]:
     end = datetime.now(timezone.utc)
-    start = end - timedelta(hours=hours)
+    start = end - timedelta(hours=24)
+    logger.info(f"VENTANA: {start.isoformat()} - {end.isoformat()}")
     logger.info(
-        "Predicción: cargando eventos para %s en ventana de %sh hasta %s.",
+        "Predicción: cargando eventos para %s en ventana [%s - %s].",
         machine_id,
-        hours,
+        start.isoformat(),
         end.isoformat(),
     )
     rows: list[dict[str, Any]] = []
     for row in iter_events_in_window(machine_id, start, end):
         ts = _parse_ts(row)
+        logger.info(f"TS EVENTO: {ts}")
+        logger.info(f"RAW EVENT: {row}")
         if ts is None:
             logger.info("Predicción: fila sin timestamp válido, omitida.")
             continue
@@ -66,6 +69,7 @@ def _load_events_in_window(machine_id: str, hours: int = 24) -> list[dict[str, A
                 ts.isoformat(),
             )
             continue
+        
         var = row.get("variable")
         if var not in ALLOWED_VARIABLES:
             logger.info("Predicción: variable desconocida '%s', omitida.", var)
@@ -76,6 +80,9 @@ def _load_events_in_window(machine_id: str, hours: int = 24) -> list[dict[str, A
             logger.info("Predicción: value no numérico, fila omitida.")
             continue
         rows.append(row)
+        if len(rows) > 5000:
+            break
+        logger.info(f"EVENTOS FINALES: {len(rows)}")
     logger.info("Predicción: %s eventos válidos en ventana para %s.", len(rows), machine_id)
     return rows
 

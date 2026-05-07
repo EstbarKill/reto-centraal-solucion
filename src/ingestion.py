@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import base64
 
 import azure.functions as func
 
-from .storage import append_event
+from azure.storage.queue import QueueClient
+from azure.core.exceptions import ResourceExistsError
+
+
 from .validation import parse_sensor_payload
 
 logger = logging.getLogger(__name__)
@@ -37,26 +42,45 @@ def handle_put_sensor(req: func.HttpRequest) -> func.HttpResponse:
             json.dumps({"error": str(e)}),
             status_code=400,
             mimetype="application/json",
-        )
+        )   
     try:
-        blob_path = append_event(event)
+        conn_str = os.environ.get("AzureWebJobsStorage")
+        if not conn_str:
+            raise ValueError("AzureWebJobsStorage no está configurado")
+
+        queue = QueueClient.from_connection_string(
+            conn_str=conn_str,
+            queue_name="sensor-events"
+        )
+
+        try:
+            queue.create_queue()
+
+        except ResourceExistsError:
+            pass
+        
+        message = base64.b64encode(
+            json.dumps(body).encode("utf-8")
+        ).decode("utf-8")
+
+        queue.send_message(json.dumps(body))
+
+        logger.info("Mensaje enviado a queue correctamente")
     except Exception as e:
-        logger.info("Ingesta: error al escribir en storage — %s", e, exc_info=True)
+        logger.error("Ingesta: error al escribir en storage — %s", e, exc_info=True)
         return func.HttpResponse(
-            json.dumps({"error": "Error de almacenamiento", "detail": str(e)}),
+            json.dumps({"error": "Error en cola", "detail": str(e)}),
             status_code=500,
             mimetype="application/json",
         )
     logger.info(
         "Ingesta: flujo completado — evento persistido; blob relativo=%s",
-        blob_path,
     )
     return func.HttpResponse(
         json.dumps(
             {
                 "status": "ok",
-                "machine_id": event.machine_id,
-                "stored_path": blob_path,
+                "machine_id": event.machine_id
             },
             ensure_ascii=False,
         ),

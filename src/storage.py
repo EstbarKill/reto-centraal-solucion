@@ -29,9 +29,11 @@ def _blob_path_for_date(machine_id: str, d: date) -> str:
 
 def _service_client() -> BlobServiceClient:
     conn = os.environ.get("AzureWebJobsStorage")
+
     if not conn:
-        raise RuntimeError("AzureWebJobsStorage no está definido en configuración local.")
-    return BlobServiceClient.from_connection_string(conn, api_version="2023-11-03")
+        raise RuntimeError("AzureWebJobsStorage no está definido.")
+
+    return BlobServiceClient.from_connection_string(conn)
 
 
 def ensure_container_exists() -> None:
@@ -48,25 +50,32 @@ def ensure_container_exists() -> None:
 
 def append_event(event: SensorEvent) -> str:
     ensure_container_exists()
-    d = event.timestamp.date()
-    blob_path = _blob_path_for_date(event.machine_id, d)
-    container = _service_client().get_container_client(_container_name())
-    blob = container.get_blob_client(blob_path)
-    line = json.dumps(event.to_ndjson_dict(), ensure_ascii=False) + "\n"
-    data = line.encode("utf-8")
-    logger.info(
-        "Almacenamiento: append NDJSON en contenedor=%s ruta=%s (bytes=%s).",
-        _container_name(),
-        blob_path,
-        len(data),
-    )
-    if not blob.exists():
-        blob.create_append_blob()
-        logger.info("Append blob nuevo creado (vacío) en ruta %s.", blob_path)
-    blob.append_block(data)
-    logger.info("Evento serializado y añadido como bloque append al NDJSON.")
-    return blob_path
 
+    d = event.timestamp.date()
+
+    blob_path = _blob_path_for_date(event.machine_id, d)
+
+    container = _service_client().get_container_client(_container_name())
+
+    blob = container.get_blob_client(blob_path)
+
+    line = json.dumps(event.to_ndjson_dict(), ensure_ascii=False) + "\n"
+
+    try:
+        existing = ""
+
+        if blob.exists():
+            existing = blob.download_blob().readall().decode("utf-8")
+
+        blob.upload_blob(existing + line, overwrite=True)
+
+        logger.info("Evento guardado correctamente en blob")
+
+    except Exception as e:
+        logger.error(f"Error escribiendo blob: {e}", exc_info=True)
+        raise
+
+    return blob_path
 
 def _download_ndjson_lines(blob_path: str) -> list[dict[str, Any]]:
     container = _service_client().get_container_client(_container_name())
