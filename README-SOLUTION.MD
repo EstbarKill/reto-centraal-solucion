@@ -156,18 +156,23 @@ Formato:
 
 ## APIs
 PUT /api/sensors -> Recibe eventos de sensores.
+
     Ejemplo
+```json
         {
             "machine_id": "PUMP-1001",
             "timestamp": "2026-05-07T03:00:00Z",
             "variable": "temperature_c",
             "value": 71.8
         }
+```
     Respuesta 
+```json
         {
             "status": "ok",
             "machine_id": "PUMP-1001"
         }
+```
 
 GET /api/machines/{machine_id}/prediction -> Obtiene predicción individual.
 
