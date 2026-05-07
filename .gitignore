@@ -1,6 +1,9 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+venv/
 .local/
 .env
 dist/
@@ -9,8 +12,16 @@ build/
 .python_packages/
 .coverage
 htmlcov/
+*.egg-info/
 
-__azurite_db*
+# Logs
 *.log
 
+# Azure Functions local settings (contiene connection strings)
 local.settings.json
+
+# Azurite — estado del emulador local (NO committear nunca)
+__azurite_db*.json
+__blobstorage__/
+__queuestorage__/
+AzuriteConfig

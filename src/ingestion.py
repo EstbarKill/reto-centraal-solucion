@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-
 import azure.functions as func
 
 from azure.storage.queue import QueueClient
@@ -20,69 +19,63 @@ def _get_queue_client() -> QueueClient:
     conn_str = os.environ.get("AzureWebJobsStorage")
     if not conn_str:
         raise RuntimeError("AzureWebJobsStorage no está configurado")
-    return QueueClient.from_connection_string(conn_str=conn_str, queue_name=_QUEUE_NAME)
+
+    return QueueClient.from_connection_string(
+        conn_str=conn_str,
+        queue_name=_QUEUE_NAME
+    )
 
 
 def handle_put_sensor(req: func.HttpRequest) -> func.HttpResponse:
-    logger.info("--- Ingesta: recibida petición PUT /api/sensors ---")
 
-    # 1. Parse body
+    logger.info("--- Ingesta: PUT /api/sensors ---")
+
     try:
         body = req.get_json()
     except ValueError:
-        logger.info("Ingesta: rechazo — cuerpo no es JSON válido.")
         return func.HttpResponse(
-            json.dumps({"error": "Cuerpo debe ser JSON"}),
-            status_code=400,
-            mimetype="application/json",
-        )
-    if not isinstance(body, dict):
-        logger.info("Ingesta: rechazo — JSON raíz debe ser objeto.")
-        return func.HttpResponse(
-            json.dumps({"error": "JSON debe ser un objeto"}),
+            json.dumps({"error": "JSON inválido"}),
             status_code=400,
             mimetype="application/json",
         )
 
-    # 2. Validate
+    if not isinstance(body, dict):
+        return func.HttpResponse(
+            json.dumps({"error": "JSON debe ser objeto"}),
+            status_code=400,
+        )
+
     try:
         event = parse_sensor_payload(body)
     except ValueError as e:
-        logger.info("Ingesta: validación fallida — %s", e)
         return func.HttpResponse(
             json.dumps({"error": str(e)}),
             status_code=400,
-            mimetype="application/json",
         )
 
-    # 3. Enqueue — send raw JSON string (queue_worker reads it the same way)
     try:
         queue = _get_queue_client()
+
         try:
             queue.create_queue()
         except ResourceExistsError:
             pass
 
-        queue.send_message(json.dumps(body, ensure_ascii=False))
-        logger.info(
-            "Ingesta: evento encolado — machine_id=%s variable=%s ts=%s",
-            event.machine_id,
-            event.variable,
-            event.timestamp.isoformat(),
-        )
+        # 🔥 FIX: incluir event_id en cola
+        payload = {
+            "event_id": event.event_id,
+            **body
+        }
+
+        queue.send_message(json.dumps(payload, ensure_ascii=False))
+
     except Exception as e:
-        logger.error("Ingesta: error al escribir en cola — %s", e, exc_info=True)
         return func.HttpResponse(
-            json.dumps({"error": "Error en cola", "detail": str(e)}),
+            json.dumps({"error": "cola error", "detail": str(e)}),
             status_code=500,
-            mimetype="application/json",
         )
 
     return func.HttpResponse(
-        json.dumps(
-            {"status": "ok", "machine_id": event.machine_id},
-            ensure_ascii=False,
-        ),
+        json.dumps({"status": "ok", "machine_id": event.machine_id}),
         status_code=200,
-        mimetype="application/json",
     )
