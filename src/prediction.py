@@ -101,7 +101,7 @@ def _features_by_variable(rows: Iterable[dict[str, Any]]) -> dict[str, dict[str,
         last = pairs[-1][1]
         mean_v = sum(vals) / len(vals)
         max_v = max(vals)
-        out[var] = {"last": last, "mean": mean_v, "max": max_v, "count": float(len(vals))}
+        out[var] = {"last": last, "mean": mean_v, "max": max_v, "count": len(vals)}
     logger.info(
         "Predicción: agregados por variable calculados para %s variables.",
         len(out),

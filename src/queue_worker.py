@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 
@@ -12,23 +11,20 @@ from src.validation import parse_sensor_payload
 logger = logging.getLogger(__name__)
 
 
-def process_queue_message(msg: func.QueueMessage):
+def process_queue_message(msg: func.QueueMessage) -> None:
     logger.info("Worker: mensaje recibido desde queue")
 
     try:
-        raw_body = msg.get_body().decode("utf-8")
+        body = json.loads(msg.get_body().decode("utf-8"))
 
-        decoded = base64.b64decode(raw_body).decode("utf-8")
-
-        logger.info(f"Worker decoded body: {decoded}")
-
-        body = json.loads(decoded)
+        logger.info(f"Worker payload: {body}")
 
         event = parse_sensor_payload(body)
 
-        append_event(event)
+        blob_path = append_event(event)
 
-        logger.info("Worker: evento guardado en blob correctamente")
+        logger.info(f"Evento guardado en {blob_path}")
 
     except Exception as e:
-        logger.error(f"Worker: error procesando mensaje: {e}", exc_info=True)
+        logger.error(f"ERROR WORKER: {e}", exc_info=True)
+        raise
