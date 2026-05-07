@@ -14,8 +14,8 @@ from .models import SensorEvent
 
 logger = logging.getLogger(__name__)
 
-CONTAINER_ENV = "BLOB_CONTAINER_NAME"
 
+CONTAINER_ENV = "BLOB_CONTAINER_NAME"
 
 def _container_name() -> str:
     return os.environ.get(CONTAINER_ENV, "raw")
@@ -63,20 +63,48 @@ def append_event(event: SensorEvent) -> str:
 
     try:
         existing = ""
+        existing_ids = set()
 
         if blob.exists():
             existing = blob.download_blob().readall().decode("utf-8")
 
+            for raw_line in existing.splitlines():
+                raw_line = raw_line.strip()
+
+                if not raw_line:
+                    continue
+
+                try:
+                    row = json.loads(raw_line)
+
+                    if "event_id" in row:
+                        existing_ids.add(row["event_id"])
+
+                except Exception:
+                    logger.info("Línea inválida ignorada en deduplicación")
+
+        # DEDUPLICACIÓN
+        if event.event_id in existing_ids:
+            logger.info(
+                "Evento duplicado detectado — event_id=%s",
+                event.event_id,
+            )
+
+            return blob_path
+
         blob.upload_blob(existing + line, overwrite=True)
 
-        logger.info("Evento guardado correctamente en blob")
+        logger.info(
+            "Evento guardado correctamente en blob — event_id=%s",
+            event.event_id,
+        )
 
     except Exception as e:
         logger.error(f"Error escribiendo blob: {e}", exc_info=True)
         raise
 
     return blob_path
-
+    
 def _download_ndjson_lines(blob_path: str) -> list[dict[str, Any]]:
     container = _service_client().get_container_client(_container_name())
     blob = container.get_blob_client(blob_path)
