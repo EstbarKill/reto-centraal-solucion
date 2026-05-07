@@ -292,8 +292,76 @@ Respuesta
     {
         "machines_scanned": 10
     }
+
+---
 ---
 
+# Pruebas unitarias
+
+El proyecto incluye pruebas unitarias para validar los componentes críticos del pipeline serverless.
+
+## Cobertura actual
+
+- Validación de payloads
+- Generación de `event_id`
+- Serialización NDJSON
+- Construcción de rutas Blob Storage
+- Cálculo de features estadísticas
+- Evaluación de riesgo y score
+- Validación de endpoints de ingesta
+
+## Estructura de pruebas
+
+```text
+tests/
+├── test_ingestion.py
+├── test_models.py
+├── test_prediction.py
+├── test_storage.py
+└── test_validation.py
+```
+
+## Ejecutar pruebas
+
+Instalar dependencias:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Ejecutar tests:
+
+```bash
+pytest -v
+```
+
+Ejecutar cobertura:
+
+```bash
+pytest --cov=src tests/
+```
+
+## Resultado esperado
+
+```text
+11 passed
+```
+
+---
+
+# Calidad de ingeniería aplicada
+
+- Arquitectura desacoplada
+- Event-driven architecture
+- Validación defensiva
+- Idempotencia
+- Logging estructurado
+- Persistencia particionada
+- Testing automatizado
+- Separación de responsabilidades
+- Diseño cloud-native
+
+---
 ---
 # Posibles mejoras
 - Entrenamiento ML real.

@@ -4,3 +4,5 @@ azure-storage-queue==12.9.0
 azure-core==1.30.0
 pandas
 requests
+pytest
+pytest-cov
